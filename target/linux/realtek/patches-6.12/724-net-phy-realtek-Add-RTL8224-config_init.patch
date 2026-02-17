@@ -1,0 +1,43 @@
+--- a/drivers/net/phy/realtek/realtek_main.c
++++ b/drivers/net/phy/realtek/realtek_main.c
+@@ -1475,6 +1475,32 @@ static int rtl822xb_c45_read_status(stru
+ 	return 0;
+ }
+ 
++static int rtl8224_sds_write(struct phy_device *phydev, u32 page, u32 reg, u32 val)
++{
++	int poll;
++
++	phy_write_mmd(phydev, MDIO_MMD_VEND1, 0x400, val);
++	phy_write_mmd(phydev, MDIO_MMD_VEND1, 0x3F8, (0x1 << 15) | (0x1 << 14) | (reg << 7) | (page << 1));
++
++	return phy_read_mmd_poll_timeout(phydev, MDIO_MMD_VEND1, 0x3F8, poll,
++					 !(poll & BIT(15)), 500, 100000, false);
++}
++
++static int rtl8224_config_init(struct phy_device *phydev)
++{
++	/* Disable EEE */
++	phy_write_mmd(phydev, MDIO_MMD_AN, MDIO_AN_EEE_ADV, 0);
++	phy_write_mmd(phydev, MDIO_MMD_AN, 0x3e, 0);
++
++	/* Stability fixes for 10G-QXGMII (USXGMII) */
++	rtl8224_sds_write(phydev, 6, 17, 0x1);
++	rtl8224_sds_write(phydev, 6, 18, 0x5078); /* AM Period 0x5078 */
++	rtl8224_sds_write(phydev, 6, 19, 0x1);
++
++	/* Set PHY SerDes to 10G-QXGMII mode (0x080d) */
++	return phy_write_mmd(phydev, MDIO_MMD_VEND1, 0x7b20, 0x080d);
++}
++
+ static int rtl8224_cable_test_start(struct phy_device *phydev)
+ {
+ 	u32 val;
+@@ -2115,6 +2141,7 @@ static struct phy_driver realtek_drvs[]
+ 		PHY_ID_MATCH_EXACT(0x001ccad0),
+ 		.name		= "RTL8224 2.5Gbps PHY",
+ 		.flags		= PHY_POLL_CABLE_TEST,
++		.config_init    = rtl8224_config_init,
+ 		.get_features   = rtl822x_c45_get_features,
+ 		.config_aneg    = rtl822x_c45_config_aneg,
+ 		.read_status    = rtl822x_c45_read_status,

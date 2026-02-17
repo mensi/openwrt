@@ -1,0 +1,352 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/dts-v1/;
+
+#include "rtl930x.dtsi"
+
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "horaco,zx-sw82ts-l2p", "realtek,rtl9302d-2x8224-2xge";
+	model = "Horaco ZX-SW82TS-L2P / S1300WP-8GT-2S+";
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x00000000 0x10000000>, <0x20000000 0x10000000>;
+	};
+
+	aliases {
+		led-boot = &led_sys;
+		led-failsafe = &led_sys;
+		led-running = &led_sys;
+		led-upgrade = &led_sys;
+	};
+
+	chosen {
+		bootargs = "console=ttyS0,115200 earlycon";
+		stdout-path = "serial0:115200n8";
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		button-reset {
+			label = "reset";
+			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led_sys: led-0 {
+			label = "green:system";
+			gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "heartbeat";
+		};
+
+		/* 2.5G Port LEDs (RTL8231 Dev 1 & 2) */
+		led-1 {
+			label = "green:lan1";
+			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+		};
+		led-2 {
+			label = "yellow:lan1";
+			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
+		};
+		led-3 {
+			label = "green:lan2";
+			gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
+		};
+		led-4 {
+			label = "yellow:lan2";
+			gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
+		};
+		led-5 {
+			label = "green:lan3";
+			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
+		};
+		led-6 {
+			label = "yellow:lan3";
+			gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;
+		};
+		led-7 {
+			label = "green:lan4";
+			gpios = <&gpio1 26 GPIO_ACTIVE_LOW>;
+		};
+		led-8 {
+			label = "yellow:lan4";
+			gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
+		};
+
+		led-9 {
+			label = "green:lan5";
+			gpios = <&gpio2 2 GPIO_ACTIVE_LOW>;
+		};
+		led-10 {
+			label = "yellow:lan5";
+			gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
+		};
+		led-11 {
+			label = "green:lan6";
+			gpios = <&gpio2 8 GPIO_ACTIVE_LOW>;
+		};
+		led-12 {
+			label = "yellow:lan6";
+			gpios = <&gpio2 11 GPIO_ACTIVE_LOW>;
+		};
+		led-13 {
+			label = "green:lan7";
+			gpios = <&gpio2 14 GPIO_ACTIVE_LOW>;
+		};
+		led-14 {
+			label = "yellow:lan7";
+			gpios = <&gpio2 23 GPIO_ACTIVE_LOW>;
+		};
+		led-15 {
+			label = "green:lan8";
+			gpios = <&gpio2 26 GPIO_ACTIVE_LOW>;
+		};
+		led-16 {
+			label = "yellow:lan8";
+			gpios = <&gpio2 29 GPIO_ACTIVE_LOW>;
+		};
+
+		/* SFP Status LEDs */
+		led-17 {
+			label = "green:sfp1";
+			gpios = <&gpio2 32 GPIO_ACTIVE_LOW>;
+		};
+		led-18 {
+			label = "green:sfp2";
+			gpios = <&gpio2 35 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	i2c-poe {
+		compatible = "i2c-gpio";
+		sda-gpios = <&gpio0 4 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		scl-gpios = <&gpio0 3 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		i2c-gpio,delay-us = <2>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		rtc@51 {
+			compatible = "nxp,pcf8563";
+			reg = <0x51>;
+		};
+
+	};
+
+	sfp_p26: sfp-p26 {
+		compatible = "sff,sfp";
+		i2c-bus = <&i2c0>;
+		mod-def0-gpio = <&gpio1 31 GPIO_ACTIVE_LOW>;
+		los-gpio = <&gpio1 32 GPIO_ACTIVE_HIGH>;
+		tx-fault-gpio = <&gpio1 33 GPIO_ACTIVE_HIGH>;
+	};
+
+	sfp_p27: sfp-p27 {
+		compatible = "sff,sfp";
+		i2c-bus = <&i2c1>;
+		mod-def0-gpio = <&gpio1 34 GPIO_ACTIVE_LOW>;
+		los-gpio = <&gpio1 35 GPIO_ACTIVE_HIGH>;
+		tx-fault-gpio = <&gpio1 36 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&pinmux_gpio_mdio_en {
+	pinctrl-single,bits = <0x0 0x133 0x133>;
+};
+
+&i2c_mst1 {
+	status = "okay";
+	clock-frequency = <100000>;
+
+	i2c0: i2c@0 {
+		reg = <0>;
+	};
+
+	i2c1: i2c@1 {
+		reg = <1>;
+	};
+};
+
+&uart0 {
+	current-speed = <115200>;
+};
+
+&spi0 {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x0000000 0x00e0000>;
+				read-only;
+			};
+
+			partition@e0000 {
+				label = "u-boot-env";
+				reg = <0x00e0000 0x0010000>;
+			};
+
+			partition@f0000 {
+				label = "sysinfo";
+				reg = <0x00f0000 0x0010000>;
+				read-only;
+			};
+
+			partition@100000 {
+				label = "firmware";
+				reg = <0x0100000 0x01f00000>;
+			};
+		};
+	};
+};
+
+&ethernet0 {
+	status = "okay";
+};
+
+&mdio_ctrl {
+	status = "okay";
+};
+
+&mdio_aux {
+	status = "okay";
+
+	gpio1: gpio@0 {
+		compatible = "realtek,rtl8231";
+		reg = <0>;
+		gpio-controller;
+		gpio-ranges = <&gpio1 0 0 37>;
+		#gpio-cells = <2>;
+	};
+
+	gpio2: gpio@1 {
+		compatible = "realtek,rtl8231";
+		reg = <1>;
+		gpio-controller;
+		gpio-ranges = <&gpio2 0 0 37>;
+		#gpio-cells = <2>;
+	};
+};
+
+&mdio_bus1 {
+	status = "okay";
+
+	/* RTL8224 Quad-PHY 1 (Ports 1-4) */
+	phy16: ethernet-phy@16 {
+		reg = <16>;
+		realtek,smi-address = <0>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy17: ethernet-phy@17 {
+		reg = <17>;
+		realtek,smi-address = <1>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy18: ethernet-phy@18 {
+		reg = <18>;
+		realtek,smi-address = <2>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy19: ethernet-phy@19 {
+		reg = <19>;
+		realtek,smi-address = <3>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+};
+
+&mdio_bus2 {
+	status = "okay";
+
+	/* RTL8224 Quad-PHY 2 (Ports 5-8) */
+	phy20: ethernet-phy@20 {
+		reg = <20>;
+		realtek,smi-address = <0>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy21: ethernet-phy@21 {
+		reg = <21>;
+		realtek,smi-address = <1>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy22: ethernet-phy@22 {
+		reg = <22>;
+		realtek,smi-address = <2>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy23: ethernet-phy@23 {
+		reg = <23>;
+		realtek,smi-address = <3>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+};
+
+&switch0 {
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		/* LAN 1-4: Mac 16-19 -> SerDes 6 */
+		SWITCH_PORT_SDS(16, 1, 6, 10g-qxgmii)
+		SWITCH_PORT_SDS(17, 2, 6, 10g-qxgmii)
+		SWITCH_PORT_SDS(18, 3, 6, 10g-qxgmii)
+		SWITCH_PORT_SDS(19, 4, 6, 10g-qxgmii)
+
+		/* LAN 5-8: Mac 20-23 -> SerDes 7 */
+		SWITCH_PORT_SDS(20, 5, 7, 10g-qxgmii)
+		SWITCH_PORT_SDS(21, 6, 7, 10g-qxgmii)
+		SWITCH_PORT_SDS(22, 7, 7, 10g-qxgmii)
+		SWITCH_PORT_SDS(23, 8, 7, 10g-qxgmii)
+
+		port@26 {
+			reg = <26>;
+			label = "sfp1";
+			phy-mode = "10gbase-r";
+			managed = "in-band-status";
+			pcs-handle = <&serdes8>;
+			sfp = <&sfp_p26>;
+		};
+
+		port@27 {
+			reg = <27>;
+			label = "sfp2";
+			phy-mode = "10gbase-r";
+			managed = "in-band-status";
+			pcs-handle = <&serdes9>;
+			sfp = <&sfp_p27>;
+		};
+
+		port@28 {
+			reg = <28>;
+			label = "cpu";
+			ethernet = <&ethernet0>;
+			phy-mode = "internal";
+
+			fixed-link {
+				speed = <1000>;
+				full-duplex;
+			};
+		};
+	};
+};

@@ -25,6 +25,16 @@ define Device/hasivo_s1100wp-8gt-se
 endef
 TARGET_DEVICES += hasivo_s1100wp-8gt-se
 
+define Device/horaco_zx-sw82ts-l2p
+  SOC := rtl9302
+  DEVICE_VENDOR := Horaco
+  DEVICE_MODEL := ZX-SW82TS-L2P / S1300WP-8GT-2S+
+  DEVICE_PACKAGES := poemgr kmod-i2c-gpio kmod-rtc-pcf8563
+  IMAGE_SIZE := 31744k
+  $(Device/kernel-lzma)
+endef
+TARGET_DEVICES += horaco_zx-sw82ts-l2p
+
 define Device/plasmacloud-common
   SOC := rtl9302
   UIMAGE_MAGIC := 0x93000000
@@ -113,24 +123,6 @@ define Device/xikestor_sks8300-8x
 	append-rootfs | pad-rootfs | append-metadata | check-size
 endef
 TARGET_DEVICES += xikestor_sks8300-8x
-
-define Device/xikestor_sks8300-12e2t2x
-  SOC := rtl9302
-  UIMAGE_MAGIC := 0x93000000
-  DEVICE_VENDOR := XikeStor
-  DEVICE_MODEL := SKS8300-12E2T2X
-  IMAGE_SIZE := 20480k
-  $(Device/kernel-lzma)
-  IMAGE/sysupgrade.bin := \
-    pad-extra 16 | \
-    append-kernel | \
-    pad-to 64k | \
-    append-rootfs | \
-    pad-rootfs | \
-    check-size | \
-    append-metadata
-endef
-TARGET_DEVICES += xikestor_sks8300-12e2t2x
 
 define Device/xikestor_sks8310-8x
   SOC := rtl9303

@@ -2156,7 +2156,9 @@ static void rtpcs_930x_sds_do_rx_calibration_1(struct rtpcs_serdes *sds,
 	/* For a 10GBit serdes wit Fibre, SDS 8 or 9 */
 	if (hw_mode == RTPCS_SDS_MODE_10GBASER ||
 	    hw_mode == RTPCS_SDS_MODE_1000BASEX ||
-	    hw_mode == RTPCS_SDS_MODE_SGMII)
+	    hw_mode == RTPCS_SDS_MODE_SGMII ||
+	    hw_mode == RTPCS_SDS_MODE_USXGMII_10GQXGMII ||
+	    hw_mode == RTPCS_SDS_MODE_USXGMII_10GSXGMII)
 		rtpcs_sds_write_bits(sds, 0x2e, 0x16,  3,  2, 0x02);
 	else
 		pr_err("%s not PHY-based or SerDes, implement DAC!\n", __func__);
@@ -2847,6 +2849,20 @@ static const struct rtpcs_sds_config rtpcs_930x_sds_cfg_5g_qsgmii[] =
 	{0x2A, 0x02, 0x35A1},{0x2A, 0x03, 0x6960},
 };
 
+static const struct rtpcs_sds_config rtpcs_930x_sds_cfg_usxgmii_qx[] =
+{
+	{0x06, 0x0D, 0x0F00},{0x07, 0x11, 0x0540},{0x20, 0x12, 0x05F3},
+	{0x21, 0x02, 0x03C0},{0x21, 0x05, 0x40B0},{0x21, 0x07, 0xF09F},{0x21, 0x08, 0x0000},
+	{0x21, 0x0D, 0x0009},{0x21, 0x0F, 0x0008},
+	{0x2A, 0x00, 0x8668},{0x2A, 0x01, 0x2088},{0x2A, 0x02, 0xD020},{0x2A, 0x09, 0xF000},
+	{0x2A, 0x0F, 0xFFDF},{0x2A, 0x12, 0x2084},{0x2A, 0x13, 0x027F},{0x2A, 0x14, 0x1311},
+	{0x2A, 0x16, 0x00CB},{0x2A, 0x17, 0xA100},{0x2A, 0x18, 0x3E48},{0x2A, 0x1E, 0x07FA},
+	{0x2B, 0x02, 0x1017},{0x2B, 0x05, 0x7F7C},{0x2B, 0x07, 0x8100},{0x2B, 0x08, 0x0001},
+	{0x2B, 0x0A, 0x7C2F},{0x2B, 0x0F, 0x0121},{0x2B, 0x11, 0x8840},{0x2B, 0x13, 0x0050},
+	{0x2B, 0x16, 0x4000},{0x2F, 0x17, 0x4108},{0x2B, 0x18, 0x8E88},{0x2B, 0x19, 0x4902},
+	{0x2B, 0x1A, 0xA12B},{0x2B, 0x1C, 0x7109},
+};
+
 static void rtpcs_930x_sds_usxgmii_config(struct rtpcs_serdes *sds, int nway_en,
 					  u32 opcode, u32 am_period,
 					  u32 all_am_markers, u32 an_table,
@@ -2857,21 +2873,25 @@ static void rtpcs_930x_sds_usxgmii_config(struct rtpcs_serdes *sds, int nway_en,
 	rtpcs_sds_write_bits(sds, 0x7, 0x11, 2, 2, nway_en);
 	rtpcs_sds_write_bits(sds, 0x7, 0x11, 3, 3, nway_en);
 	rtpcs_sds_write_bits(sds, 0x6, 0x12, 15, 0, am_period);
-	rtpcs_sds_write_bits(sds, 0x6, 0x13, 7,  0, all_am_markers);
-	rtpcs_sds_write_bits(sds, 0x6, 0x13, 15, 8, all_am_markers);
-	rtpcs_sds_write_bits(sds, 0x6, 0x14, 7,  0, all_am_markers);
-	rtpcs_sds_write_bits(sds, 0x6, 0x14, 15, 8, all_am_markers);
-	rtpcs_sds_write_bits(sds, 0x6, 0x15, 7,  0, all_am_markers);
-	rtpcs_sds_write_bits(sds, 0x6, 0x15, 15, 8, all_am_markers);
-	rtpcs_sds_write_bits(sds, 0x6, 0x16, 7,  0, all_am_markers);
-	rtpcs_sds_write_bits(sds, 0x6, 0x16, 15, 8, all_am_markers);
-	rtpcs_sds_write_bits(sds, 0x6, 0x17, 7,  0, all_am_markers);
-	rtpcs_sds_write_bits(sds, 0x6, 0x17, 15, 8, all_am_markers);
-	rtpcs_sds_write_bits(sds, 0x6, 0x18, 7,  0, all_am_markers);
-	rtpcs_sds_write_bits(sds, 0x6, 0x18, 15, 8, all_am_markers);
+
+	if (all_am_markers) {
+		rtpcs_sds_write_bits(sds, 0x6, 0x13, 7,  0, all_am_markers);
+		rtpcs_sds_write_bits(sds, 0x6, 0x13, 15, 8, all_am_markers);
+		rtpcs_sds_write_bits(sds, 0x6, 0x14, 7,  0, all_am_markers);
+		rtpcs_sds_write_bits(sds, 0x6, 0x14, 15, 8, all_am_markers);
+		rtpcs_sds_write_bits(sds, 0x6, 0x15, 7,  0, all_am_markers);
+		rtpcs_sds_write_bits(sds, 0x6, 0x15, 15, 8, all_am_markers);
+		rtpcs_sds_write_bits(sds, 0x6, 0x16, 7,  0, all_am_markers);
+		rtpcs_sds_write_bits(sds, 0x6, 0x16, 15, 8, all_am_markers);
+		rtpcs_sds_write_bits(sds, 0x6, 0x17, 7,  0, all_am_markers);
+		rtpcs_sds_write_bits(sds, 0x6, 0x17, 15, 8, all_am_markers);
+		rtpcs_sds_write_bits(sds, 0x6, 0x18, 7,  0, all_am_markers);
+		rtpcs_sds_write_bits(sds, 0x6, 0x18, 15, 8, all_am_markers);
+	}
+
 	rtpcs_sds_write_bits(sds, 0x7, 0x10, 7, 0, opcode);
 	rtpcs_sds_write_bits(sds, 0x6, 0xe, 10, 10, an_table);
-	rtpcs_sds_write_bits(sds, 0x6, 0x1d, 11, 10, sync_bit);
+	rtpcs_sds_write_bits(sds, 0x6, 0x14, 1, 1, sync_bit);
 }
 
 static void rtpcs_930x_sds_patch(struct rtpcs_serdes *sds,
@@ -2939,6 +2959,10 @@ static void rtpcs_930x_sds_patch(struct rtpcs_serdes *sds,
 		break;
 
 	case RTPCS_SDS_MODE_USXGMII_10GQXGMII:
+		config = rtpcs_930x_sds_cfg_usxgmii_qx;
+		count = ARRAY_SIZE(rtpcs_930x_sds_cfg_usxgmii_qx);
+		break;
+
 	default:
 		return;
 	}
@@ -2947,7 +2971,7 @@ static void rtpcs_930x_sds_patch(struct rtpcs_serdes *sds,
 		rtpcs_sds_write(sds, config[i].page, config[i].reg, config[i].data);
 
 	if (hw_mode == RTPCS_SDS_MODE_USXGMII_10GQXGMII) {
-		/* Default configuration */
+		/* Default configuration for RTL8224 Quad-PHY */
 		rtpcs_930x_sds_usxgmii_config(sds, 1, 0xaa, 0x5078, 0, 1, 0x1);
 	}
 }
