@@ -47,88 +47,55 @@
 			linux,default-trigger = "heartbeat";
 		};
 
-		/* 2.5G Port LEDs (RTL8231 Dev 1 & 2) */
-		led-1 {
-			label = "green:lan1";
-			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-		};
-		led-2 {
-			label = "yellow:lan1";
-			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
-		};
-		led-3 {
-			label = "green:lan2";
-			gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
-		};
-		led-4 {
-			label = "yellow:lan2";
-			gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
-		};
-		led-5 {
-			label = "green:lan3";
-			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
-		};
-		led-6 {
-			label = "yellow:lan3";
-			gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;
-		};
-		led-7 {
-			label = "green:lan4";
-			gpios = <&gpio1 26 GPIO_ACTIVE_LOW>;
-		};
-		led-8 {
-			label = "yellow:lan4";
-			gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
-		};
+		/*
+		 * Port LEDs are driven by the RTL9302D serial LED controller.
+		 * The single RTL8231 on this board is in SHIFT REGISTER MODE
+		 * (pin 15/Dis_SMI pulled HIGH to VCC). It has no MDIO interface
+		 * and cannot be used as GPIO — it only receives serial LED data
+		 * via SI (pin 17) and CLK_IN (pin 18) from the SoC.
+		 *
+		 * LED[0]-LED[35] = 36 parallel outputs from the RTL8231.
+		 * See the led_set node below for per-port LED configuration.
+		 * Physical LED[n] → PCB LED mapping requires hardware measurement.
+		 */
+	};
 
-		led-9 {
-			label = "green:lan5";
-			gpios = <&gpio2 2 GPIO_ACTIVE_LOW>;
-		};
-		led-10 {
-			label = "yellow:lan5";
-			gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
-		};
-		led-11 {
-			label = "green:lan6";
-			gpios = <&gpio2 8 GPIO_ACTIVE_LOW>;
-		};
-		led-12 {
-			label = "yellow:lan6";
-			gpios = <&gpio2 11 GPIO_ACTIVE_LOW>;
-		};
-		led-13 {
-			label = "green:lan7";
-			gpios = <&gpio2 14 GPIO_ACTIVE_LOW>;
-		};
-		led-14 {
-			label = "yellow:lan7";
-			gpios = <&gpio2 23 GPIO_ACTIVE_LOW>;
-		};
-		led-15 {
-			label = "green:lan8";
-			gpios = <&gpio2 26 GPIO_ACTIVE_LOW>;
-		};
-		led-16 {
-			label = "yellow:lan8";
-			gpios = <&gpio2 29 GPIO_ACTIVE_LOW>;
-		};
+	/*
+	 * LED serial controller configuration for the RTL9302D.
+	 *
+	 * The SoC serializes per-port link/speed/activity state and shifts
+	 * it out to the RTL8231 (in shift register mode) autonomously.
+	 *
+	 * LED set 0: 8× 2.5G copper ports (MAC 16-23), 3 LEDs each.
+	 *   LED0 (green):  2.5G LINK/ACT
+	 *   LED1 (yellow): 1G LINK/ACT
+	 *   LED2 (amber):  10M/100M LINK/ACT
+	 *
+	 * LED set 1: 2× SFP+ ports (MAC 26-27), 2 LEDs each.
+	 *   LED0 (green):  1G LINK/ACT
+	 *   LED1 (yellow): 10G LINK/ACT
+	 *
+	 * Total bits in serial stream: 8×3 + 2×2 = 28 bits (fits in 36 RTL8231 outputs).
+	 *
+	 * NOTE: The exact mapping of RTL8231 LED[n] outputs to physical PCB LEDs
+	 * has not been verified and requires hardware measurement.
+	 */
+	led_set {
+		compatible = "realtek,rtl9300-leds";
+		active-low;
 
-		/* SFP Status LEDs */
-		led-17 {
-			label = "green:sfp1";
-			gpios = <&gpio2 32 GPIO_ACTIVE_LOW>;
-		};
-		led-18 {
-			label = "green:sfp2";
-			gpios = <&gpio2 35 GPIO_ACTIVE_LOW>;
-		};
+		led_set0 = <(RTL93XX_LED_SET_2P5G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+			    (RTL93XX_LED_SET_1G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+			    (RTL93XX_LED_SET_100M | RTL93XX_LED_SET_10M | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)>;
+
+		led_set1 = <(RTL93XX_LED_SET_1G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+			    (RTL93XX_LED_SET_10G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)>;
 	};
 
 	i2c-poe {
 		compatible = "i2c-gpio";
-		sda-gpios = <&gpio0 4 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
 		scl-gpios = <&gpio0 3 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		sda-gpios = <&gpio0 4 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
 		i2c-gpio,delay-us = <2>;
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -137,28 +104,39 @@
 			compatible = "nxp,pcf8563";
 			reg = <0x51>;
 		};
-
 	};
 
+	/*
+	 * SFP 1 (MAC/port 26): connected to SerDes 8 (10gbase-r).
+	 *
+	 * SFP control signals (tx-disable, mod-def0, los, tx-fault) are on
+	 * SoC GPIO or HASIVO MCU GPIO — NOT on the RTL8231 (shift register
+	 * mode: no GPIO capability).
+	 *
+	 * SFP EEPROM I2C: connection unknown. The i2c-ddm.ko DDM driver is
+	 * designed for a different board variant using RTL8231 GPIO bit-bang,
+	 * which does not apply here.
+	 *
+	 * TODO: Identify exact SoC GPIO or MCU pins for SFP control signals
+	 *       and SFP EEPROM I2C via hardware measurement.
+	 */
 	sfp_p26: sfp-p26 {
 		compatible = "sff,sfp";
-		i2c-bus = <&i2c0>;
-		mod-def0-gpio = <&gpio1 31 GPIO_ACTIVE_LOW>;
-		los-gpio = <&gpio1 32 GPIO_ACTIVE_HIGH>;
-		tx-fault-gpio = <&gpio1 33 GPIO_ACTIVE_HIGH>;
+		i2c-bus = <&i2c0>; /* To be verified */
 	};
 
+	/*
+	 * SFP 2 (MAC/port 27): connected to SerDes 9 (10gbase-r).
+	 *
+	 * Same constraints as SFP 1 above.
+	 *
+	 * TODO: Identify exact SoC GPIO or MCU pins for SFP control signals
+	 *       and SFP EEPROM I2C via hardware measurement.
+	 */
 	sfp_p27: sfp-p27 {
 		compatible = "sff,sfp";
-		i2c-bus = <&i2c1>;
-		mod-def0-gpio = <&gpio1 34 GPIO_ACTIVE_LOW>;
-		los-gpio = <&gpio1 35 GPIO_ACTIVE_HIGH>;
-		tx-fault-gpio = <&gpio1 36 GPIO_ACTIVE_HIGH>;
+		i2c-bus = <&i2c1>;  /* To be verified */
 	};
-};
-
-&pinmux_gpio_mdio_en {
-	pinctrl-single,bits = <0x0 0x133 0x133>;
 };
 
 &i2c_mst1 {
@@ -220,84 +198,54 @@
 	status = "okay";
 };
 
-&mdio_ctrl {
-	status = "okay";
-};
-
-&mdio_aux {
+&mdio_bus2 {
 	status = "okay";
 
-	gpio1: gpio@0 {
-		compatible = "realtek,rtl8231";
-		reg = <0>;
-		gpio-controller;
-		gpio-ranges = <&gpio1 0 0 37>;
-		#gpio-cells = <2>;
-	};
-
-	gpio2: gpio@1 {
-		compatible = "realtek,rtl8231";
-		reg = <1>;
-		gpio-controller;
-		gpio-ranges = <&gpio2 0 0 37>;
-		#gpio-cells = <2>;
-	};
-};
-
-&mdio_bus1 {
-	status = "okay";
-
-	/* RTL8224 Quad-PHY 1 (Ports 1-4) */
 	phy16: ethernet-phy@16 {
 		reg = <16>;
-		realtek,smi-address = <0>;
+		realtek,smi-address = <1>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 	};
 
 	phy17: ethernet-phy@17 {
 		reg = <17>;
-		realtek,smi-address = <1>;
+		realtek,smi-address = <2>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 	};
 
 	phy18: ethernet-phy@18 {
 		reg = <18>;
-		realtek,smi-address = <2>;
+		realtek,smi-address = <3>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 	};
 
 	phy19: ethernet-phy@19 {
 		reg = <19>;
-		realtek,smi-address = <3>;
+		realtek,smi-address = <4>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 	};
-};
 
-&mdio_bus2 {
-	status = "okay";
-
-	/* RTL8224 Quad-PHY 2 (Ports 5-8) */
 	phy20: ethernet-phy@20 {
 		reg = <20>;
-		realtek,smi-address = <0>;
+		realtek,smi-address = <5>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 	};
 
 	phy21: ethernet-phy@21 {
 		reg = <21>;
-		realtek,smi-address = <1>;
+		realtek,smi-address = <6>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 	};
 
 	phy22: ethernet-phy@22 {
 		reg = <22>;
-		realtek,smi-address = <2>;
+		realtek,smi-address = <7>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 	};
 
 	phy23: ethernet-phy@23 {
 		reg = <23>;
-		realtek,smi-address = <3>;
+		realtek,smi-address = <8>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 	};
 };
@@ -307,30 +255,90 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		/* LAN 1-4: Mac 16-19 -> SerDes 6 */
-		SWITCH_PORT_SDS(16, 1, 6, 10g-qxgmii)
-		SWITCH_PORT_SDS(17, 2, 6, 10g-qxgmii)
-		SWITCH_PORT_SDS(18, 3, 6, 10g-qxgmii)
-		SWITCH_PORT_SDS(19, 4, 6, 10g-qxgmii)
+		/* LAN 1-4: MAC 16-19 → SerDes 6 (QXGMII), LED set 0 */
+		port@16 {
+			reg = <16>;
+			label = "lan1";
+			led-set = <0>;
+			pcs-handle = <&serdes6>;
+			phy-handle = <&phy16>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@17 {
+			reg = <17>;
+			label = "lan2";
+			led-set = <0>;
+			pcs-handle = <&serdes6>;
+			phy-handle = <&phy17>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@18 {
+			reg = <18>;
+			label = "lan3";
+			led-set = <0>;
+			pcs-handle = <&serdes6>;
+			phy-handle = <&phy18>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@19 {
+			reg = <19>;
+			label = "lan4";
+			led-set = <0>;
+			pcs-handle = <&serdes6>;
+			phy-handle = <&phy19>;
+			phy-mode = "10g-qxgmii";
+		};
 
-		/* LAN 5-8: Mac 20-23 -> SerDes 7 */
-		SWITCH_PORT_SDS(20, 5, 7, 10g-qxgmii)
-		SWITCH_PORT_SDS(21, 6, 7, 10g-qxgmii)
-		SWITCH_PORT_SDS(22, 7, 7, 10g-qxgmii)
-		SWITCH_PORT_SDS(23, 8, 7, 10g-qxgmii)
+		/* LAN 5-8: MAC 20-23 → SerDes 7 (QXGMII), LED set 0 */
+		port@20 {
+			reg = <20>;
+			label = "lan5";
+			led-set = <0>;
+			pcs-handle = <&serdes7>;
+			phy-handle = <&phy20>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@21 {
+			reg = <21>;
+			label = "lan6";
+			led-set = <0>;
+			pcs-handle = <&serdes7>;
+			phy-handle = <&phy21>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@22 {
+			reg = <22>;
+			label = "lan7";
+			led-set = <0>;
+			pcs-handle = <&serdes7>;
+			phy-handle = <&phy22>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@23 {
+			reg = <23>;
+			label = "lan8";
+			led-set = <0>;
+			pcs-handle = <&serdes7>;
+			phy-handle = <&phy23>;
+			phy-mode = "10g-qxgmii";
+		};
 
+		/* SFP+ 1: MAC 26 → SerDes 8 (10gbase-r), LED set 1 */
 		port@26 {
 			reg = <26>;
 			label = "sfp1";
+			led-set = <1>;
 			phy-mode = "10gbase-r";
 			managed = "in-band-status";
 			pcs-handle = <&serdes8>;
 			sfp = <&sfp_p26>;
 		};
 
+		/* SFP+ 2: MAC 27 → SerDes 9 (10gbase-r), LED set 1 */
 		port@27 {
 			reg = <27>;
 			label = "sfp2";
+			led-set = <1>;
 			phy-mode = "10gbase-r";
 			managed = "in-band-status";
 			pcs-handle = <&serdes9>;
