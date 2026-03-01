@@ -1,9 +1,12 @@
 --- a/drivers/net/phy/realtek/realtek_main.c
 +++ b/drivers/net/phy/realtek/realtek_main.c
-@@ -173,6 +173,31 @@
- #define RTL8224_VND1_MDI_REVERSE		0xa90
- #define RTL8224_VND1_MDI_POLARITY_SWAP		0xa94
+@@ -170,6 +170,34 @@
  
+ #define RTL8224_SRAM_RTCT_LEN(pair)		(0x8028 + (pair) * 4)
+ 
++#define RTL8224_VND1_MDI_REVERSE		0xa90
++#define RTL8224_VND1_MDI_POLARITY_SWAP		0xa94
++
 +#define RTL8224_VND1_SERDES_CMD			0x3f8
 +#define RTL8224_VND1_SERDES_READ		0x3fc
 +#define RTL8224_VND1_SERDES_WRITE		0x400
@@ -32,8 +35,22 @@
  #define RTL8221B_PHYCR1				0xa430
  #define RTL8221B_PHYCR1_ALDPS_EN		BIT(2)
  #define RTL8221B_PHYCR1_ALDPS_XTAL_OFF_EN	BIT(12)
-@@ -1906,10 +1931,175 @@
- 			      RTL8224_VND1_MDI_POLARITY_SWAP, val);
+@@ -225,6 +253,13 @@ struct rtl822x_priv {
+ 	bool enable_aldps;
+ };
+ 
++struct rtl8224_priv {
++	bool set_reverse;
++	u32 mdi_reverse;
++	bool set_polarity;
++	u32 mdi_polarity;
++};
++
+ static int rtl821x_read_page(struct phy_device *phydev)
+ {
+ 	return __phy_read(phydev, RTL821x_PAGE_SELECT);
+@@ -1703,6 +1738,214 @@ static int rtl822xb_c45_read_status(stru
+ 	return 0;
  }
  
 +static int rtl8224_sds_read(struct phy_device *phydev, int page, u32 reg)
@@ -196,15 +213,63 @@
 +	return 0;
 +}
 +
- static int rtl8224_config_init(struct phy_device *phydev)
- {
++static void rtl8224_mdi_reverse(struct phy_device *phydev, u32 val)
++{
++	phy_write_mmd(phydev, MDIO_MMD_VEND1,
++		      RTL8224_VND1_MDI_REVERSE, val);
++}
++
++static void rtl8224_mdi_polarity_swap(struct phy_device *phydev, u32 val)
++{
++	phy_write_mmd(phydev, MDIO_MMD_VEND1,
++		      RTL8224_VND1_MDI_POLARITY_SWAP, val);
++}
++
++static int rtl8224_probe(struct phy_device *phydev)
++{
++	struct device *dev = &phydev->mdio.dev;
++	struct rtl8224_priv *priv;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->set_reverse = !of_property_read_u32(dev->of_node, "mdi-reverse",
++						  &priv->mdi_reverse);
++	priv->set_polarity = !of_property_read_u32(dev->of_node, "mdi-polarity",
++						   &priv->mdi_polarity);
++
++	phydev->priv = priv;
++	return 0;
++}
++
++static int rtl8224_config_init(struct phy_device *phydev)
++{
 +	int ret;
- 	struct rtl8224_priv *priv = phydev->priv;
- 
++	struct rtl8224_priv *priv = phydev->priv;
++
 +	ret = rtl8224_serdes_config(phydev);
 +	if (ret)
 +		return ret;
 +
- 	if (priv->set_reverse) {
- 		rtl8224_mdi_reverse(phydev, priv->mdi_reverse);
- 	}
++	if (priv->set_reverse)
++		rtl8224_mdi_reverse(phydev, priv->mdi_reverse);
++
++	if (priv->set_polarity)
++		rtl8224_mdi_polarity_swap(phydev, priv->mdi_polarity);
++
++	return 0;
++}
++
+ static int rtl8224_cable_test_start(struct phy_device *phydev)
+ {
+ 	u32 val;
+@@ -2466,6 +2709,8 @@ static struct phy_driver realtek_drvs[]
+ 		PHY_ID_MATCH_EXACT(0x001ccad0),
+ 		.name		= "RTL8224 2.5Gbps PHY",
+ 		.flags		= PHY_POLL_CABLE_TEST,
++		.probe		= rtl8224_probe,
++		.config_init	= rtl8224_config_init,
+ 		.get_features	= rtl822x_c45_get_features,
+ 		.config_aneg	= rtl822x_c45_config_aneg,
+ 		.read_status	= rtl822x_c45_read_status,
