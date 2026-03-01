@@ -1,0 +1,410 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/dts-v1/;
+
+#include "rtl930x.dtsi"
+
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "horaco,zx-sw82ts-l2p", "realtek,rtl9302d-2x8224-2xge";
+	model = "Horaco ZX-SW82TS-L2P / S1300WP-8GT-2S+";
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x00000000 0x10000000>, <0x20000000 0x10000000>;
+	};
+
+	aliases {
+		led-boot = &led_sys;
+		led-failsafe = &led_sys;
+		led-running = &led_sys;
+		led-upgrade = &led_sys;
+	};
+
+	chosen {
+		bootargs = "console=ttyS0,115200 earlycon";
+		stdout-path = "serial0:115200n8";
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		button-reset {
+			label = "reset";
+			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led_sys: led-0 {
+			label = "green:system";
+			gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "heartbeat";
+		};
+
+		/*
+		 * Port LEDs are driven by the RTL9302D serial LED controller.
+		 * The single RTL8231 on this board is in SHIFT REGISTER MODE
+		 * (pin 15/Dis_SMI pulled HIGH to VCC). It has no MDIO interface
+		 * and cannot be used as GPIO — it only receives serial LED data
+		 * via SI (pin 17) and CLK_IN (pin 18) from the SoC.
+		 *
+		 * LED[0]-LED[35] = 36 parallel outputs from the RTL8231.
+		 * See the led_set node below for per-port LED configuration.
+		 * Physical LED[n] → PCB LED mapping requires hardware measurement.
+		 */
+	};
+
+	/*
+	 * LED serial controller configuration for the RTL9302D.
+	 *
+	 * The vendor firmware hardware profile (RTL9302D_2x8224_2XGE) defines
+	 * 4 entries per copper port and 3 per SFP+ port, but 0x0000 entries are
+	 * spacers.  The vendor firmware binary (rtcore.ko) skips 0x0000 entries
+	 * when computing LED_PORT_NUM_CTRL, giving 2 effective LEDs per copper
+	 * port and 1 per SFP+ port (confirmed: LAN1 amber works in vendor fw).
+	 * Total serial stream: 8×2 + 2×1 = 18 bits — fits in 36 RTL8231 outputs
+	 * with no overflow.
+	 *
+	 * Note: the OpenWRT driver (rtl930x_led_init) writes DTS array elements
+	 * in REVERSE order to hardware LED slots:
+	 *   DTS[0] → hw slot 1 (second serialised, physical green LED)
+	 *   DTS[1] → hw slot 0 (first serialised,  physical amber LED)
+	 *
+	 * Vendor's effective slot mapping (set 0, after skipping spacers):
+	 *   Slot 0 (first serialised):  0xA09 = 10G+2.5G LINK/ACT  → amber LED
+	 *   Slot 1 (second serialised): 0xA20 = 1G LINK/ACT         → green LED
+	 *
+	 * Physical LED assignment per port (18-bit stream, ascending MAC order):
+	 *   Copper amber: bits 1, 3, 5, 7, 9, 11, 13, 15 → LED[35,33,31,29,27,25,23,21]
+	 *   Copper green: bits 2, 4, 6, 8,10, 12, 14, 16 → LED[34,32,30,28,26,24,22,20]
+	 *   SFP1 green:   bit 17  → LED[19]
+	 *   SFP2 green:   bit 18  → LED[18]
+	 *   (Exact RTL8231 output → PCB trace mapping requires hardware measurement.)
+	 */
+	led_set {
+		compatible = "realtek,rtl9300-leds";
+		active-low;
+
+		/*
+		 * Copper ports (LED set 0, 2 effective slots/port):
+		 *   DTS[0] = green (all-speeds LINK/ACT) → hw slot 1 (physical green)
+		 *   DTS[1] = amber (2.5G LINK/ACT)        → hw slot 0 (physical amber)
+		 * Amber lights only at 2.5G; green lights at any connected speed.
+		 * At 2.5G both LEDs are active (amber = speed, green = link/act).
+		 */
+		led_set0 = <
+			(RTL93XX_LED_SET_10M | RTL93XX_LED_SET_100M | RTL93XX_LED_SET_1G |
+			 RTL93XX_LED_SET_2P5G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+			(RTL93XX_LED_SET_2P5G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+		>;
+
+		/*
+		 * SFP+ ports (LED set 3, 1 effective slot/port):
+		 *   DTS[0] = green (10G+1G LINK/ACT) → hw slot 0 (physical green)
+		 * One green link/activity LED per SFP+ port.
+		 */
+		led_set3 = <
+			(RTL93XX_LED_SET_10G | RTL93XX_LED_SET_1G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+		>;
+	};
+
+	i2c-poe {
+		compatible = "i2c-gpio";
+		scl-gpios = <&gpio0 3 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		sda-gpios = <&gpio0 4 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		i2c-gpio,delay-us = <2>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		rtc@51 {
+			compatible = "nxp,pcf8563";
+			reg = <0x51>;
+		};
+	};
+
+	/*
+	 * SFP 1 (MAC/port 26): connected to SerDes 8 (10gbase-r).
+	 *
+	 * SFP control signals (tx-disable, mod-def0, los, tx-fault) are on
+	 * SoC GPIO or HASIVO MCU GPIO — NOT on the RTL8231 (shift register
+	 * mode: no GPIO capability).
+	 *
+	 * SFP EEPROM I2C: connection unknown. The i2c-ddm.ko DDM driver is
+	 * designed for a different board variant using RTL8231 GPIO bit-bang,
+	 * which does not apply here.
+	 *
+	 * TODO: Identify exact SoC GPIO or MCU pins for SFP control signals
+	 *       and SFP EEPROM I2C via hardware measurement.
+	 */
+	sfp_p26: sfp-p26 {
+		compatible = "sff,sfp";
+		i2c-bus = <&i2c0>; /* To be verified */
+	};
+
+	/*
+	 * SFP 2 (MAC/port 27): connected to SerDes 9 (10gbase-r).
+	 *
+	 * Same constraints as SFP 1 above.
+	 *
+	 * TODO: Identify exact SoC GPIO or MCU pins for SFP control signals
+	 *       and SFP EEPROM I2C via hardware measurement.
+	 */
+	sfp_p27: sfp-p27 {
+		compatible = "sff,sfp";
+		i2c-bus = <&i2c1>;  /* To be verified */
+	};
+};
+
+&i2c_mst1 {
+	status = "okay";
+	clock-frequency = <100000>;
+
+	/*
+	 * SFP EEPROM I2C via RTL9302D hardware I2C master 1 (MST1).
+	 * MST1 SCL = SoC GPIO8 (fixed).
+	 * SDA channel = sda_pin_id in i2c_devConf_t; SDA6 = GPIO15, SDA7 = GPIO16.
+	 *
+	 * Source: vendor firmware i2c-ddm.ko DDM index assignment:
+	 *   nsm/imi default branch: xe1/27 -> DDM index 6, xe1/28 -> DDM index 7.
+	 * SDK r9300_i2c_dev_init: sda_pin_id <= 7 -> hardware I2C, SDA_OUT_SEL = sda_pin_id.
+	 * SDK i2c_rtl9300.c line 196: GPIO8_SCL_SEL_MASK -> SCL always GPIO8 for MST1.
+	 */
+	i2c0: i2c@6 {
+		reg = <6>;
+	};
+
+	i2c1: i2c@7 {
+		reg = <7>;
+	};
+};
+
+/*
+ * SerDes polarity settings from vendor firmware hardware profile
+ * (RTL9302D_2x8224_2XGE, extracted from rtcore.ko):
+ *
+ * SerDes 6 (LAN 1-4, QXGMII): rx_polarity=CHANGE, tx_polarity=CHANGE
+ * SerDes 7 (LAN 5-8, QXGMII): rx_polarity=NORMAL, tx_polarity=CHANGE
+ * SerDes 8 (SFP1, 10GR):      rx_polarity=NORMAL, tx_polarity=NORMAL
+ * SerDes 9 (SFP2, 10GR):      rx_polarity=NORMAL, tx_polarity=NORMAL
+ */
+&serdes6 {
+	realtek,pnswap-rx;
+	realtek,pnswap-tx;
+};
+
+&serdes7 {
+	realtek,pnswap-tx;
+};
+
+&uart0 {
+	current-speed = <115200>;
+};
+
+&spi0 {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x0000000 0x00e0000>;
+				read-only;
+			};
+
+			partition@e0000 {
+				label = "u-boot-env";
+				reg = <0x00e0000 0x0010000>;
+			};
+
+			partition@f0000 {
+				label = "sysinfo";
+				reg = <0x00f0000 0x0010000>;
+				read-only;
+			};
+
+			partition@100000 {
+				label = "firmware";
+				reg = <0x0100000 0x01f00000>;
+			};
+		};
+	};
+};
+
+&ethernet0 {
+	status = "okay";
+};
+
+&mdio_bus2 {
+	status = "okay";
+
+	phy16: ethernet-phy@16 {
+		reg = <16>;
+		realtek,smi-address = <1>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy17: ethernet-phy@17 {
+		reg = <17>;
+		realtek,smi-address = <2>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy18: ethernet-phy@18 {
+		reg = <18>;
+		realtek,smi-address = <3>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy19: ethernet-phy@19 {
+		reg = <19>;
+		realtek,smi-address = <4>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy20: ethernet-phy@20 {
+		reg = <20>;
+		realtek,smi-address = <5>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy21: ethernet-phy@21 {
+		reg = <21>;
+		realtek,smi-address = <6>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy22: ethernet-phy@22 {
+		reg = <22>;
+		realtek,smi-address = <7>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+
+	phy23: ethernet-phy@23 {
+		reg = <23>;
+		realtek,smi-address = <8>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+	};
+};
+
+&switch0 {
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		/* LAN 1-4: MAC 16-19 → SerDes 6 (QXGMII), LED set 0 */
+		port@16 {
+			reg = <16>;
+			label = "lan1";
+			led-set = <0>;
+			pcs-handle = <&serdes6>;
+			phy-handle = <&phy16>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@17 {
+			reg = <17>;
+			label = "lan2";
+			led-set = <0>;
+			pcs-handle = <&serdes6>;
+			phy-handle = <&phy17>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@18 {
+			reg = <18>;
+			label = "lan3";
+			led-set = <0>;
+			pcs-handle = <&serdes6>;
+			phy-handle = <&phy18>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@19 {
+			reg = <19>;
+			label = "lan4";
+			led-set = <0>;
+			pcs-handle = <&serdes6>;
+			phy-handle = <&phy19>;
+			phy-mode = "10g-qxgmii";
+		};
+
+		/* LAN 5-8: MAC 20-23 → SerDes 7 (QXGMII), LED set 0 */
+		port@20 {
+			reg = <20>;
+			label = "lan5";
+			led-set = <0>;
+			pcs-handle = <&serdes7>;
+			phy-handle = <&phy20>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@21 {
+			reg = <21>;
+			label = "lan6";
+			led-set = <0>;
+			pcs-handle = <&serdes7>;
+			phy-handle = <&phy21>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@22 {
+			reg = <22>;
+			label = "lan7";
+			led-set = <0>;
+			pcs-handle = <&serdes7>;
+			phy-handle = <&phy22>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@23 {
+			reg = <23>;
+			label = "lan8";
+			led-set = <0>;
+			pcs-handle = <&serdes7>;
+			phy-handle = <&phy23>;
+			phy-mode = "10g-qxgmii";
+		};
+
+		/* SFP+ 1: MAC 26 → SerDes 8 (10gbase-r), LED set 3 */
+		port@26 {
+			reg = <26>;
+			label = "sfp1";
+			led-set = <3>;
+			phy-mode = "10gbase-r";
+			managed = "in-band-status";
+			pcs-handle = <&serdes8>;
+			sfp = <&sfp_p26>;
+		};
+
+		/* SFP+ 2: MAC 27 → SerDes 9 (10gbase-r), LED set 3 */
+		port@27 {
+			reg = <27>;
+			label = "sfp2";
+			led-set = <3>;
+			phy-mode = "10gbase-r";
+			managed = "in-band-status";
+			pcs-handle = <&serdes9>;
+			sfp = <&sfp_p27>;
+		};
+
+		port@28 {
+			reg = <28>;
+			label = "cpu";
+			ethernet = <&ethernet0>;
+			phy-mode = "internal";
+
+			fixed-link {
+				speed = <1000>;
+				full-duplex;
+			};
+		};
+	};
+};

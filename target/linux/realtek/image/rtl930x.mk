@@ -20,6 +20,16 @@ define Device/hasivo_s1100wp-8gt-se
 endef
 TARGET_DEVICES += hasivo_s1100wp-8gt-se
 
+define Device/horaco_zx-sw82ts-l2p
+  SOC := rtl9302
+  DEVICE_VENDOR := Horaco
+  DEVICE_MODEL := ZX-SW82TS-L2P / S1300WP-8GT-2S+
+  DEVICE_PACKAGES := poemgr kmod-i2c-gpio kmod-rtc-pcf8563
+  IMAGE_SIZE := 31744k
+  $(Device/kernel-lzma)
+endef
+TARGET_DEVICES += horaco_zx-sw82ts-l2p
+
 define Device/plasmacloud-common
   SOC := rtl9302
   UIMAGE_MAGIC := 0x93000000
