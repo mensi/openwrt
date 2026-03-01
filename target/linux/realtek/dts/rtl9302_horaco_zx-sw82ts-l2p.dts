@@ -92,26 +92,33 @@
 		active-low;
 
 		/*
-		 * Copper ports (LED set 0, 2 effective slots/port):
-		 *   DTS[0] = green (all-speeds LINK/ACT) → hw slot 1 (physical green)
-		 *   DTS[1] = amber (2.5G LINK/ACT)        → hw slot 0 (physical amber)
-		 * Amber lights only at 2.5G; green lights at any connected speed.
-		 * At 2.5G both LEDs are active (amber = speed, green = link/act).
+		 * Copper ports (LED set 0): 3 slots/port.
+		 * Slot 2 (DTS[0]) = Green
+		 * Slot 1 (DTS[1]) = Amber
+		 * Slot 0 (DTS[2]) = 0
 		 */
 		led_set0 = <
 			(RTL93XX_LED_SET_10M | RTL93XX_LED_SET_100M | RTL93XX_LED_SET_1G |
 			 RTL93XX_LED_SET_2P5G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
 			(RTL93XX_LED_SET_2P5G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+			0x0000
 		>;
 
 		/*
-		 * SFP+ ports (LED set 3, 1 effective slot/port):
-		 *   DTS[0] = green (10G+1G LINK/ACT) → hw slot 0 (physical green)
-		 * One green link/activity LED per SFP+ port.
+		 * SFP+ ports (LED set 3): 1 slot.
 		 */
 		led_set3 = <
 			(RTL93XX_LED_SET_10G | RTL93XX_LED_SET_1G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
 		>;
+
+		/*
+		 * Alignment:
+		 * - MAC 13-24: 12 ports * 3 bits = 36 bits (Total Register).
+		 * - MAC 13, 14, 15 = 9-bit preamble.
+		 * - MAC 16 = Port 1 (Starts at bit 10).
+		 */
+		realtek,led-set0-force-port-mask = <0x01ffe000>;
+		realtek,led-set3-force-port-mask = <0x0c000000>;
 	};
 
 	i2c-poe {
