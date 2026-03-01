@@ -66,31 +66,23 @@
 		>;
 
 		/*
-		 * Preamble (LED set 1): 4 slots/port.
-		 */
-		led_set1 = <
-			0x0000 0x0000 0x0000 0x0000
-		>;
-
-		/*
 		 * SFP+ ports (LED set 3): 2 slots/port (Bi-color).
-		 * Slot 1 (DTS[0]) = Red (Link/Act)
-		 * Slot 0 (DTS[1]) = Green (Link/Act)
+		 * Slot 1 (DTS[0]) = Red (10G Link/Act)
+		 * Slot 0 (DTS[1]) = Green (1G Link/Act)
 		 */
 		led_set3 = <
-			(RTL93XX_LED_SET_10G | RTL93XX_LED_SET_1G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
-			(RTL93XX_LED_SET_10G | RTL93XX_LED_SET_1G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+			(RTL93XX_LED_SET_10G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+			(RTL93XX_LED_SET_1G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
 		>;
 
 		/*
-		 * Alignment Strategy:
-		 * - MAC 14, 15: 8 bits preamble (Set 1).
-		 * - MAC 16-23: 24 bits copper (Set 0).
-		 * - MAC 26, 27: 4 bits SFP colors (Set 3).
-		 * Total stream: 36 bits (Exact Register Size).
+		 * Total Serial Stream (36 bits):
+		 * - MAC 12-15: 4 ports * 3 bits = 12-bit Preamble (Set 0).
+		 * - MAC 16-23: 8 ports * 3 bits = 24 bits Copper (Set 0).
+		 * - MAC 26-27: 2 ports * 2 bits = 4 bits SFP colors (Set 3).
+		 * (MAC 24, 25 skipped to prevent shifts).
 		 */
-		realtek,led-set1-force-port-mask = <0x0000c000>;
-		realtek,led-set0-force-port-mask = <0x00ff0000>;
+		realtek,led-set0-force-port-mask = <0x00fff000>;
 		realtek,led-set3-force-port-mask = <0x0c000000>;
 	};
 
