@@ -251,52 +251,67 @@
 &mdio_bus2 {
 	status = "okay";
 
+	/*
+	 * RTL8224 quad-port 2.5G PHY #1 (SerDes 6, QXGMII).
+	 * MDI pin swap from HWP profile rtl9302c_2x8224_2xge:
+	 *   phy_addr 0,1 (first two ports): mdi_pin_swap = 0
+	 *   phy_addr 2,3 (last two ports):  mdi_pin_swap = 1
+	 */
 	phy16: ethernet-phy@16 {
 		reg = <16>;
 		realtek,smi-address = <1>;
 		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <0>;
 	};
 
 	phy17: ethernet-phy@17 {
 		reg = <17>;
 		realtek,smi-address = <2>;
 		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <0>;
 	};
 
 	phy18: ethernet-phy@18 {
 		reg = <18>;
 		realtek,smi-address = <3>;
 		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <1>;
 	};
 
 	phy19: ethernet-phy@19 {
 		reg = <19>;
 		realtek,smi-address = <4>;
 		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <1>;
 	};
 
+	/* RTL8224 quad-port 2.5G PHY #2 (SerDes 7, QXGMII) */
 	phy20: ethernet-phy@20 {
 		reg = <20>;
 		realtek,smi-address = <5>;
 		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <0>;
 	};
 
 	phy21: ethernet-phy@21 {
 		reg = <21>;
 		realtek,smi-address = <6>;
 		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <0>;
 	};
 
 	phy22: ethernet-phy@22 {
 		reg = <22>;
 		realtek,smi-address = <7>;
 		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <1>;
 	};
 
 	phy23: ethernet-phy@23 {
 		reg = <23>;
 		realtek,smi-address = <8>;
 		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <1>;
 	};
 };
 
