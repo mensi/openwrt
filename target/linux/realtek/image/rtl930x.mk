@@ -24,7 +24,7 @@ define Device/horaco_zx-sw82ts-l2p
   SOC := rtl9302
   DEVICE_VENDOR := Horaco
   DEVICE_MODEL := ZX-SW82TS-L2P / S1300WP-8GT-2S+
-  DEVICE_PACKAGES := poemgr kmod-i2c-gpio kmod-rtc-pcf8563
+  DEVICE_PACKAGES := poemgr kmod-i2c-gpio kmod-rtc-pcf8563 kmod-hasivo-mcu-wdt
   IMAGE_SIZE := 31744k
   $(Device/kernel-lzma)
 endef

@@ -98,6 +98,11 @@
 			compatible = "nxp,pcf8563";
 			reg = <0x51>;
 		};
+
+		mcu@6f {
+			compatible = "hasivo,mcu-wdt";
+			reg = <0x6f>;
+		};
 	};
 
 	sfp_p26: sfp-p26 {
