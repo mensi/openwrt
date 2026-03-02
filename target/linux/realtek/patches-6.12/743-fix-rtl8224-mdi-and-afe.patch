@@ -1,6 +1,6 @@
 --- a/drivers/net/phy/realtek/realtek_main.c
 +++ b/drivers/net/phy/realtek/realtek_main.c
-@@ -170,6 +170,34 @@
+@@ -170,6 +170,42 @@
  
  #define RTL8224_SRAM_RTCT_LEN(pair)		(0x8028 + (pair) * 4)
  
@@ -26,19 +26,13 @@
 +#define RTL8224_SDS_NWAY_PAGE			0x7
 +#define RTL8224_SDS_NWAY_OPCODE_REG		0x10
 +#define RTL8224_SDS_NWAY_OPCODE_MASK		GENMASK(7, 0)
++#define RTL8224_SDS_NWAY_AN_REG			0x11
 +
 +#define RTL8224_SDS_REG0_TX_PAGE		0x2e
 +#define RTL8224_SDS_REG0_TX_POST1_REG		0x6
 +#define RTL8224_SDS_REG0_TX_REG			0x7
 +#define RTL8224_SDS_REG0_TX_Z0_REG		0xb
 +
- #define RTL8221B_PHYCR1				0xa430
- #define RTL8221B_PHYCR1_ALDPS_EN		BIT(2)
- #define RTL8221B_PHYCR1_ALDPS_XTAL_OFF_EN	BIT(12)
-@@ -225,6 +253,13 @@ struct rtl822x_priv {
- 	bool enable_aldps;
- };
- 
 +struct rtl8224_priv {
 +	bool set_reverse;
 +	u32 mdi_reverse;
@@ -46,11 +40,11 @@
 +	u32 mdi_polarity;
 +};
 +
- static int rtl821x_read_page(struct phy_device *phydev)
- {
- 	return __phy_read(phydev, RTL821x_PAGE_SELECT);
-@@ -1703,6 +1738,214 @@ static int rtl822xb_c45_read_status(stru
- 	return 0;
+ #define RTL8221B_PHYCR1				0xa430
+ #define RTL8221B_PHYCR1_ALDPS_EN		BIT(2)
+ #define RTL8221B_PHYCR1_ALDPS_XTAL_OFF_EN	BIT(12)
+@@ -1543,6 +1579,266 @@ static int rtl822x_config_aneg(struct ph
+ 	return __genphy_config_aneg(phydev, ret);
  }
  
 +static int rtl8224_sds_read(struct phy_device *phydev, int page, u32 reg)
@@ -69,7 +63,7 @@
 +
 +	ret = phy_read_mmd_poll_timeout(phydev, MDIO_MMD_VEND1,
 +					RTL8224_VND1_SERDES_CMD, tmp,
-+					!(tmp & BIT(15)), 500, 500000000,
++					!(tmp & BIT(15)), 500, 500000,
 +					false);
 +	if (ret < 0)
 +		return ret;
@@ -94,7 +88,7 @@
 +
 +	return phy_read_mmd_poll_timeout(phydev, MDIO_MMD_VEND1,
 +					 RTL8224_VND1_SERDES_CMD, tmp,
-+					 !(tmp & BIT(15)), 500, 500000000,
++					 !(tmp & BIT(15)), 500, 500000,
 +					 false);
 +}
 +
@@ -112,6 +106,46 @@
 +
 +	ret = rtl8224_sds_write(phydev, page, reg, val);
 +	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static int rtl8224_int_read(struct phy_device *phydev, u32 reg, u32 *data)
++{
++	int l_data, h_data;
++	int base_addr = phydev->mdio.addr & ~3;
++
++	l_data = mdiobus_c45_read(phydev->mdio.bus, base_addr, MDIO_MMD_VEND1, reg);
++	if (l_data < 0)
++		return l_data;
++
++	h_data = mdiobus_c45_read(phydev->mdio.bus, base_addr, MDIO_MMD_VEND1, reg + 1);
++	if (h_data < 0)
++		return h_data;
++
++	*data = (u32)l_data | ((u32)h_data << 16);
++	return 0;
++}
++
++static int rtl8224_int_modify(struct phy_device *phydev, u32 reg, u32 mask, u32 data)
++{
++	u32 val;
++	int ret;
++	int base_addr = phydev->mdio.addr & ~3;
++
++	ret = rtl8224_int_read(phydev, reg, &val);
++	if (ret < 0)
++		return ret;
++
++	val = (val & ~mask) | (data & mask);
++
++	ret = mdiobus_c45_write(phydev->mdio.bus, base_addr, MDIO_MMD_VEND1, reg, val & 0xffff);
++	if (ret < 0)
++		return ret;
++
++	ret = mdiobus_c45_write(phydev->mdio.bus, base_addr, MDIO_MMD_VEND1, reg + 1, (val >> 16) & 0xffff);
++	if (ret < 0)
 +		return ret;
 +
 +	return 0;
@@ -196,6 +230,10 @@
 +	/* Page 0x07, reg 0x13 (TGR_PRO_1_REG19), bit 12 = USXG_RXDV_OFF */
 +	rtl8224_sds_modify(phydev, 0x07, 0x13, BIT(12), BIT(12));
 +
++	/* Enable all 4 QXGMII channels for NWay */
++	rtl8224_sds_modify(phydev, RTL8224_SDS_NWAY_PAGE,
++			   RTL8224_SDS_NWAY_AN_REG, 0x000f, 0x000f);
++
 +	/* Step 8-9: Set submode to QXGMII and mode to USXGMII */
 +	phy_modify_mmd(phydev, MDIO_MMD_VEND1, RTL8224_VND1_SERDES_MODE,
 +		       RTL8224_VND1_SERDES_SUBMODE_MASK,
@@ -210,19 +248,27 @@
 +	rtl8224_sds_modify(phydev, 0x20, 0x00, GENMASK(5, 4), 0x30);
 +	rtl8224_sds_modify(phydev, 0x20, 0x00, GENMASK(5, 4), 0x00);
 +
++	/* AFE patches for 2.5G signal integrity (SDK: rtl8224_a_patch_afe_conf) */
++	phy_write_paged(phydev, 0x02, 0x12, 0x0007); /* 0xbf84: Page 0xbf8, Reg 0x4 */
++	phy_write_paged(phydev, 0x02, 0x16, 0x0000); /* 0xbf8c: Page 0xbf8, Reg 0xc */
++
 +	return 0;
 +}
 +
 +static void rtl8224_mdi_reverse(struct phy_device *phydev, u32 val)
 +{
-+	phy_write_mmd(phydev, MDIO_MMD_VEND1,
-+		      RTL8224_VND1_MDI_REVERSE, val);
++	int port_offset = phydev->mdio.addr & 3;
++
++	rtl8224_int_modify(phydev, RTL8224_VND1_MDI_REVERSE,
++			   BIT(port_offset), val ? BIT(port_offset) : 0);
 +}
 +
 +static void rtl8224_mdi_polarity_swap(struct phy_device *phydev, u32 val)
 +{
-+	phy_write_mmd(phydev, MDIO_MMD_VEND1,
-+		      RTL8224_VND1_MDI_POLARITY_SWAP, val);
++	int port_offset = (phydev->mdio.addr & 3);
++
++	rtl8224_int_modify(phydev, RTL8224_VND1_MDI_POLARITY_SWAP,
++			   0xf << (port_offset * 4), val ? (val & 0xf) << (port_offset * 4) : 0);
 +}
 +
 +static int rtl8224_probe(struct phy_device *phydev)
@@ -261,10 +307,10 @@
 +	return 0;
 +}
 +
- static int rtl8224_cable_test_start(struct phy_device *phydev)
+ static void rtl822xb_update_interface(struct phy_device *phydev)
  {
- 	u32 val;
-@@ -2466,6 +2709,8 @@ static struct phy_driver realtek_drvs[]
+ 	int val;
+@@ -2466,6 +2762,8 @@ static struct phy_driver realtek_drvs[]
  		PHY_ID_MATCH_EXACT(0x001ccad0),
  		.name		= "RTL8224 2.5Gbps PHY",
  		.flags		= PHY_POLL_CABLE_TEST,
