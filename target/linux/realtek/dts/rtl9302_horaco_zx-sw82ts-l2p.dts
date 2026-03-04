@@ -173,8 +173,26 @@
 			};
 
 			partition@100000 {
+				label = "jffs2_cfg";
+				reg = <0x0100000 0x0100000>;
+				read-only;
+			};
+
+			partition@200000 {
+				label = "jffs2_log";
+				reg = <0x0200000 0x0100000>;
+				read-only;
+			};
+
+			partition@300000 {
+				label = "runtime";
+				reg = <0x0300000 0x0700000>;
+				read-only;
+			};
+
+			partition@a00000 {
 				label = "firmware";
-				reg = <0x0100000 0x01f00000>;
+				reg = <0x0a00000 0x1600000>;
 			};
 		};
 	};
