@@ -43,7 +43,7 @@
  #define RTL8221B_PHYCR1				0xa430
  #define RTL8221B_PHYCR1_ALDPS_EN		BIT(2)
  #define RTL8221B_PHYCR1_ALDPS_XTAL_OFF_EN	BIT(12)
-@@ -1543,6 +1579,266 @@ static int rtl822x_config_aneg(struct ph
+@@ -1543,6 +1579,267 @@ static int rtl822x_config_aneg(struct ph
  	return __genphy_config_aneg(phydev, ret);
  }
  
@@ -249,8 +249,9 @@
 +	rtl8224_sds_modify(phydev, 0x20, 0x00, GENMASK(5, 4), 0x00);
 +
 +	/* AFE patches for 2.5G signal integrity (SDK: rtl8224_a_patch_afe_conf) */
-+	phy_write_paged(phydev, 0x02, 0x12, 0x0007); /* 0xbf84: Page 0xbf8, Reg 0x4 */
-+	phy_write_paged(phydev, 0x02, 0x16, 0x0000); /* 0xbf8c: Page 0xbf8, Reg 0xc */
++	/* VEND2 0xbf84 bits[2:0] = 4, VEND2 0xbf8c bits[10:6] = 0 */
++	phy_modify_mmd(phydev, MDIO_MMD_VEND2, 0xbf84, GENMASK(2, 0), 4);
++	phy_modify_mmd(phydev, MDIO_MMD_VEND2, 0xbf8c, GENMASK(10, 6), 0);
 +
 +	return 0;
 +}
@@ -310,7 +311,7 @@
  static void rtl822xb_update_interface(struct phy_device *phydev)
  {
  	int val;
-@@ -2466,6 +2762,8 @@ static struct phy_driver realtek_drvs[]
+@@ -2466,6 +2763,8 @@ static struct phy_driver realtek_drvs[]
  		PHY_ID_MATCH_EXACT(0x001ccad0),
  		.name		= "RTL8224 2.5Gbps PHY",
  		.flags		= PHY_POLL_CABLE_TEST,
