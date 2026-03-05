@@ -164,6 +164,12 @@
 			partition@e0000 {
 				label = "u-boot-env";
 				reg = <0x00e0000 0x0010000>;
+
+				nvmem-layout {
+					compatible = "u-boot,env";
+					macaddr_ubootenv_ethaddr: ethaddr {
+					};
+				};
 			};
 
 			partition@f0000 {
@@ -200,6 +206,8 @@
 
 &ethernet0 {
 	status = "okay";
+	nvmem-cells = <&macaddr_ubootenv_ethaddr 0>;
+	nvmem-cell-names = "mac-address";
 };
 
 &mdio_bus2 {
@@ -335,7 +343,7 @@
 
 		port@26 {
 			reg = <26>;
-			label = "sfp1";
+			label = "lan9";
 			led-set = <3>;
 			phy-mode = "10gbase-r";
 			managed = "in-band-status";
@@ -345,7 +353,7 @@
 
 		port@27 {
 			reg = <27>;
-			label = "sfp2";
+			label = "lan10";
 			led-set = <3>;
 			phy-mode = "10gbase-r";
 			managed = "in-band-status";
