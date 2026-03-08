@@ -99,9 +99,100 @@
 			reg = <0x51>;
 		};
 
-		mcu@6f {
+		mcu_wdt: mcu@6f {
 			compatible = "hasivo,mcu-wdt";
 			reg = <0x6f>;
+		};
+
+		stc8: mfd@4d {
+			compatible = "hasivo,stc8-mfd", "syscon";
+			reg = <0x4d>;
+			hasivo,execute-bit = <0x40>;
+			hasivo,execute-bit-registers = <0x01 0x02>;
+
+			poe_led_lan1: led-1 {
+				compatible = "register-bit-led";
+				offset = <0x01>;
+				mask = <0x08>;
+				label = "orange:poe_lan1";
+				default-state = "off";
+				linux,default-trigger = "pse1:port0:delivering";
+			};
+
+			poe_led_lan2: led-2 {
+				compatible = "register-bit-led";
+				offset = <0x01>;
+				mask = <0x04>;
+				label = "orange:poe_lan2";
+				default-state = "off";
+				linux,default-trigger = "pse1:port1:delivering";
+			};
+
+			poe_led_lan3: led-3 {
+				compatible = "register-bit-led";
+				offset = <0x01>;
+				mask = <0x02>;
+				label = "orange:poe_lan3";
+				default-state = "off";
+				linux,default-trigger = "pse1:port2:delivering";
+			};
+
+			poe_led_lan4: led-4 {
+				compatible = "register-bit-led";
+				offset = <0x01>;
+				mask = <0x01>;
+				label = "orange:poe_lan4";
+				default-state = "off";
+				linux,default-trigger = "pse1:port3:delivering";
+			};
+
+			poe_led_lan5: led-5 {
+				compatible = "register-bit-led";
+				offset = <0x02>;
+				mask = <0x08>;
+				label = "orange:poe_lan5";
+				default-state = "off";
+				linux,default-trigger = "pse2:port0:delivering";
+			};
+
+			poe_led_lan6: led-6 {
+				compatible = "register-bit-led";
+				offset = <0x02>;
+				mask = <0x04>;
+				label = "orange:poe_lan6";
+				default-state = "off";
+				linux,default-trigger = "pse2:port1:delivering";
+			};
+
+			poe_led_lan7: led-7 {
+				compatible = "register-bit-led";
+				offset = <0x02>;
+				mask = <0x02>;
+				label = "orange:poe_lan7";
+				default-state = "off";
+				linux,default-trigger = "pse2:port2:delivering";
+			};
+
+			poe_led_lan8: led-8 {
+				compatible = "register-bit-led";
+				offset = <0x02>;
+				mask = <0x01>;
+				label = "orange:poe_lan8";
+				default-state = "off";
+				linux,default-trigger = "pse2:port3:delivering";
+			};
+		};
+
+		pse1: pse@d {
+			compatible = "hasivo,hs104pti";
+			reg = <0x0d>;
+			#pse-cells = <1>;
+		};
+
+		pse2: pse@15 {
+			compatible = "hasivo,hs104pti";
+			reg = <0x15>;
+			#pse-cells = <1>;
 		};
 	};
 
@@ -218,6 +309,7 @@
 		realtek,smi-address = <1>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 		mdi-reverse = <0>;
+		pses = <&pse1 0>;
 	};
 
 	phy17: ethernet-phy@17 {
@@ -225,6 +317,7 @@
 		realtek,smi-address = <2>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 		mdi-reverse = <0>;
+		pses = <&pse1 1>;
 	};
 
 	phy18: ethernet-phy@18 {
@@ -232,6 +325,7 @@
 		realtek,smi-address = <3>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 		mdi-reverse = <1>;
+		pses = <&pse1 2>;
 	};
 
 	phy19: ethernet-phy@19 {
@@ -239,6 +333,7 @@
 		realtek,smi-address = <4>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 		mdi-reverse = <1>;
+		pses = <&pse1 3>;
 	};
 
 	phy20: ethernet-phy@20 {
@@ -246,6 +341,7 @@
 		realtek,smi-address = <5>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 		mdi-reverse = <0>;
+		pses = <&pse2 0>;
 	};
 
 	phy21: ethernet-phy@21 {
@@ -253,6 +349,7 @@
 		realtek,smi-address = <6>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 		mdi-reverse = <0>;
+		pses = <&pse2 1>;
 	};
 
 	phy22: ethernet-phy@22 {
@@ -260,6 +357,7 @@
 		realtek,smi-address = <7>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 		mdi-reverse = <1>;
+		pses = <&pse2 2>;
 	};
 
 	phy23: ethernet-phy@23 {
@@ -267,11 +365,12 @@
 		realtek,smi-address = <8>;
 		compatible = "ethernet-phy-ieee802.3-c45";
 		mdi-reverse = <1>;
+		pses = <&pse2 3>;
 	};
 };
 
 &switch0 {
-	ports {
+	ethernet-ports {
 		#address-cells = <1>;
 		#size-cells = <0>;
 

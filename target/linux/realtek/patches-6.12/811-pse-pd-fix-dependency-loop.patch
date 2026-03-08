@@ -1,0 +1,30 @@
+--- a/drivers/of/property.c
++++ b/drivers/of/property.c
+@@ -1288,7 +1288,7 @@ static const struct supplier_bindings of
+ 	{ .parse_prop = parse_backlight, },
+ 	{ .parse_prop = parse_panel, },
+ 	{ .parse_prop = parse_msi_parent, },
+-	{ .parse_prop = parse_pses, },
++	{ .parse_prop = parse_pses, .optional = true, },
+ 	{ .parse_prop = parse_power_supplies, },
+ 	{ .parse_prop = parse_gpio_compat, },
+ 	{ .parse_prop = parse_interrupts, },
+--- a/drivers/net/pse-pd/pse_core.c
++++ b/drivers/net/pse-pd/pse_core.c
+@@ -16,6 +16,7 @@
+ #include <linux/rtnetlink.h>
+ #include <net/net_trackers.h>
+ #include <linux/leds.h>
++#include <linux/fwnode.h>
+ 
+ #define PSE_PW_D_LIMIT INT_MAX
+ 
+@@ -1678,7 +1679,7 @@ struct pse_control *of_pse_control_get(s
+ 	}
+ 
+ 	if (!pcdev) {
+-		psec = ERR_PTR(-EPROBE_DEFER);
++		psec = ERR_PTR(-EPROBE_DEFER);
+ 		goto out;
+ 	}
+ 
