@@ -214,7 +214,7 @@
 +#endif
  };
  
- /**
+ #endif
 --- a/drivers/net/pse-pd/Kconfig
 +++ b/drivers/net/pse-pd/Kconfig
 @@ -52,4 +52,12 @@ config PSE_TPS23881
@@ -239,7 +239,7 @@
 +obj-$(CONFIG_PSE_HASIVO_HS104) += hasivo_hs104.o
 --- /dev/null
 +++ b/drivers/net/pse-pd/hasivo_hs104.c
-@@ -0,0 +1,245 @@
+@@ -0,0 +1,237 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Hasivo HS104 PoE PSE controller driver
@@ -444,7 +444,6 @@
 +	unsigned int devid;
 +	int ret;
 +
-+	dev_info(dev, "DEBUG: hs104_probe started\n");
 +	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) return -ENXIO;
 +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 +	if (!priv) return -ENOMEM;
@@ -460,14 +459,7 @@
 +	priv->pcdev.of_pse_n_cells = 1;
 +	priv->pcdev.types = ETHTOOL_PSE_C33;
 +
-+	ret = devm_pse_controller_register(dev, &priv->pcdev);
-+	if (ret) {
-+		dev_info(dev, "DEBUG: hs104_probe failed to register controller: %d\n", ret);
-+		return ret;
-+	}
-+
-+	dev_info(dev, "DEBUG: hs104_probe success\n");
-+	return 0;
++	return devm_pse_controller_register(dev, &priv->pcdev);
 +}
 +
 +static const struct of_device_id hs104_of_match[] = {
