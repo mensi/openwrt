@@ -1,0 +1,11 @@
+--- a/drivers/of/property.c
++++ b/drivers/of/property.c
+@@ -1438,7 +1438,7 @@ static const struct supplier_bindings of
+ 	{ .parse_prop = parse_backlight, },
+ 	{ .parse_prop = parse_panel, },
+ 	{ .parse_prop = parse_msi_parent, },
+-	{ .parse_prop = parse_pses, },
++	{ .parse_prop = parse_pses, .optional = true, },
+ 	{ .parse_prop = parse_power_supplies, },
+ 	{ .parse_prop = parse_gpio_compat, },
+ 	{ .parse_prop = parse_interrupts, },
