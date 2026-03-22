@@ -20,6 +20,39 @@ define Device/hasivo_s1100wp-8gt-se
 endef
 TARGET_DEVICES += hasivo_s1100wp-8gt-se
 
+define Build/horaco-factory-patch
+	rm -rf $@.tmp
+	mkdir -p $@.tmp/patch
+	
+	$(TARGET_CC) $(TARGET_CFLAGS) -static \
+		$(TOPDIR)/target/linux/realtek/image/horaco/setmac.c -o $@.tmp/patch/setmac
+	
+	cp $(TOPDIR)/target/linux/realtek/image/horaco/patch.txt $@.tmp/patch/
+	cp $(TOPDIR)/target/linux/realtek/image/horaco/install.sh $@.tmp/patch/
+	cp $@ $@.tmp/patch/openwrt.uImage
+	
+	cd $@.tmp && tar -czf patch.tar.gz patch/
+	
+	$(PYTHON) $(TOPDIR)/target/linux/realtek/image/horaco/patch-md5.py $@.tmp/patch.tar.gz
+	
+	mv $@.tmp/patch.tar.gz $@
+	rm -rf $@.tmp
+endef
+
+define Device/horaco_zx-sw82ts-l2p
+  SOC := rtl9302
+  DEVICE_VENDOR := Horaco
+  DEVICE_MODEL := ZX-SW82TS-L2P / S1300WP-8GT-2S+
+  DEVICE_PACKAGES := poemgr kmod-i2c-gpio kmod-rtc-pcf8563 kmod-hasivo-mcu-wdt \
+	luci luci-app-lldp luci-app-snmp lldpd ethtool-full snmpd \
+	-dnsmasq -firewall4 -ppp -odhcpd-ipv6only
+  IMAGE_SIZE := 29696k
+  IMAGES += factory.bin
+  IMAGE/factory.bin := append-kernel | pad-to 64k | append-rootfs | pad-rootfs | check-size | horaco-factory-patch
+  $(Device/kernel-lzma)
+endef
+TARGET_DEVICES += horaco_zx-sw82ts-l2p
+
 define Device/plasmacloud-common
   SOC := rtl9302
   UIMAGE_MAGIC := 0x93000000

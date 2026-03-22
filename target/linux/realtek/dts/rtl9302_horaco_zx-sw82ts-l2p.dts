@@ -1,0 +1,485 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/dts-v1/;
+
+#include "rtl930x.dtsi"
+
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "horaco,zx-sw82ts-l2p", "realtek,rtl9302d-2x8224-2xge";
+	model = "Horaco ZX-SW82TS-L2P / S1300WP-8GT-2S+";
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x00000000 0x10000000>, <0x20000000 0x10000000>;
+	};
+
+	aliases {
+		led-boot = &led_sys;
+		led-failsafe = &led_sys;
+		led-running = &led_sys;
+		led-upgrade = &led_sys;
+	};
+
+	chosen {
+		bootargs = "console=ttyS0,115200 earlycon";
+		stdout-path = "serial0:115200n8";
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		button-reset {
+			label = "reset";
+			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led_sys: led-0 {
+			label = "green:system";
+			gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "heartbeat";
+		};
+	};
+
+	led_set {
+		compatible = "realtek,rtl9300-leds";
+		active-low;
+
+		/*
+		 * Copper ports (LED set 0): 3 slots/port.
+		 * Slot 2 (DTS[0]) = Amber (Port N Amber)
+		 * Slot 1 (DTS[1]) = Spacer (0)
+		 * Slot 0 (DTS[2]) = Green (Port N Green)
+		 */
+		led_set0 = <
+			(RTL93XX_LED_SET_2P5G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+			0x0000
+			(RTL93XX_LED_SET_10M | RTL93XX_LED_SET_100M | RTL93XX_LED_SET_1G |
+			 RTL93XX_LED_SET_2P5G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+		>;
+
+		/*
+		 * SFP+ ports (LED set 3): 2 slots/port (Bi-color).
+		 * Slot 1 (DTS[0]) = Red (10G Link/Act)
+		 * Slot 0 (DTS[1]) = Green (1G Link/Act)
+		 */
+		led_set3 = <
+			(RTL93XX_LED_SET_10G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+			(RTL93XX_LED_SET_1G | RTL93XX_LED_SET_LINK | RTL93XX_LED_SET_ACT)
+		>;
+
+		/*
+		 * Total Serial Stream (36 bits):
+		 * - MAC 12-15: 4 ports * 3 bits = 12-bit Preamble (Set 0).
+		 * - MAC 16-23: 8 ports * 3 bits = 24 bits Copper (Set 0).
+		 * - MAC 26-27: 2 ports * 2 bits = 4 bits SFP colors (Set 3).
+		 * (MAC 24, 25 skipped to prevent shifts).
+		 */
+		realtek,led-set0-force-port-mask = <0x00fff000>;
+		realtek,led-set3-force-port-mask = <0x0c000000>;
+	};
+
+	i2c-poe {
+		compatible = "i2c-gpio";
+		scl-gpios = <&gpio0 3 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		sda-gpios = <&gpio0 4 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+		i2c-gpio,delay-us = <2>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		rtc@51 {
+			compatible = "nxp,pcf8563";
+			reg = <0x51>;
+		};
+
+		mcu_wdt: mcu@6f {
+			compatible = "hasivo,mcu-wdt";
+			reg = <0x6f>;
+		};
+
+		stc8: mfd@4d {
+			compatible = "hasivo,stc8-mfd", "syscon";
+			reg = <0x4d>;
+			hasivo,execute-bit = <0x40>;
+			hasivo,execute-bit-registers = <0x01 0x02>;
+
+			poe_led_lan1: led-1 {
+				compatible = "register-bit-led";
+				offset = <0x01>;
+				mask = <0x08>;
+				color = <LED_COLOR_ID_ORANGE>;
+				function = "poe";
+				function-enumerator = <1>;
+				default-state = "off";
+				linux,default-trigger = "2-000d:port0:delivering";
+			};
+
+			poe_led_lan2: led-2 {
+				compatible = "register-bit-led";
+				offset = <0x01>;
+				mask = <0x04>;
+				color = <LED_COLOR_ID_ORANGE>;
+				function = "poe";
+				function-enumerator = <2>;
+				default-state = "off";
+				linux,default-trigger = "2-000d:port1:delivering";
+			};
+
+			poe_led_lan3: led-3 {
+				compatible = "register-bit-led";
+				offset = <0x01>;
+				mask = <0x02>;
+				color = <LED_COLOR_ID_ORANGE>;
+				function = "poe";
+				function-enumerator = <3>;
+				default-state = "off";
+				linux,default-trigger = "2-000d:port2:delivering";
+			};
+
+			poe_led_lan4: led-4 {
+				compatible = "register-bit-led";
+				offset = <0x01>;
+				mask = <0x01>;
+				color = <LED_COLOR_ID_ORANGE>;
+				function = "poe";
+				function-enumerator = <4>;
+				default-state = "off";
+				linux,default-trigger = "2-000d:port3:delivering";
+			};
+
+			poe_led_lan5: led-5 {
+				compatible = "register-bit-led";
+				offset = <0x02>;
+				mask = <0x08>;
+				color = <LED_COLOR_ID_ORANGE>;
+				function = "poe";
+				function-enumerator = <5>;
+				default-state = "off";
+				linux,default-trigger = "2-0015:port0:delivering";
+			};
+
+			poe_led_lan6: led-6 {
+				compatible = "register-bit-led";
+				offset = <0x02>;
+				mask = <0x04>;
+				color = <LED_COLOR_ID_ORANGE>;
+				function = "poe";
+				function-enumerator = <6>;
+				default-state = "off";
+				linux,default-trigger = "2-0015:port1:delivering";
+			};
+
+			poe_led_lan7: led-7 {
+				compatible = "register-bit-led";
+				offset = <0x02>;
+				mask = <0x02>;
+				color = <LED_COLOR_ID_ORANGE>;
+				function = "poe";
+				function-enumerator = <7>;
+				default-state = "off";
+				linux,default-trigger = "2-0015:port2:delivering";
+			};
+
+			poe_led_lan8: led-8 {
+				compatible = "register-bit-led";
+				offset = <0x02>;
+				mask = <0x01>;
+				color = <LED_COLOR_ID_ORANGE>;
+				function = "poe";
+				function-enumerator = <8>;
+				default-state = "off";
+				linux,default-trigger = "2-0015:port3:delivering";
+			};
+		};
+
+		pse1: pse@d {
+			compatible = "hasivo,hs104pti";
+			reg = <0x0d>;
+			#pse-cells = <1>;
+		};
+
+		pse2: pse@15 {
+			compatible = "hasivo,hs104pti";
+			reg = <0x15>;
+			#pse-cells = <1>;
+		};
+	};
+
+	sfp_p26: sfp-p26 {
+		compatible = "sff,sfp";
+		i2c-bus = <&i2c0>;
+	};
+
+	sfp_p27: sfp-p27 {
+		compatible = "sff,sfp";
+		i2c-bus = <&i2c1>;
+	};
+};
+
+&i2c_mst1 {
+	status = "okay";
+	clock-frequency = <100000>;
+
+	i2c0: i2c@6 {
+		reg = <6>;
+	};
+
+	i2c1: i2c@7 {
+		reg = <7>;
+	};
+};
+
+&serdes6 {
+	realtek,pnswap-rx;
+	realtek,pnswap-tx;
+};
+
+&serdes7 {
+	realtek,pnswap-tx;
+};
+
+&uart0 {
+	current-speed = <115200>;
+};
+
+&spi0 {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x0000000 0x00e0000>;
+				read-only;
+			};
+
+			partition@e0000 {
+				label = "u-boot-env";
+				reg = <0x00e0000 0x0010000>;
+
+				nvmem-layout {
+					compatible = "u-boot,env";
+					macaddr_ubootenv_ethaddr: ethaddr {
+					};
+				};
+			};
+
+			partition@f0000 {
+				label = "sysinfo";
+				reg = <0x00f0000 0x0010000>;
+				read-only;
+			};
+
+			partition@100000 {
+				label = "jffs2_cfg";
+				reg = <0x0100000 0x0100000>;
+				read-only;
+			};
+
+			partition@200000 {
+				label = "jffs2_log";
+				reg = <0x0200000 0x0100000>;
+				read-only;
+			};
+
+			partition@300000 {
+				label = "firmware";
+				reg = <0x0300000 0x1d00000>;
+			};
+		};
+	};
+};
+
+&ethernet0 {
+	status = "okay";
+	nvmem-cells = <&macaddr_ubootenv_ethaddr 0>;
+	nvmem-cell-names = "mac-address";
+};
+
+&mdio_bus2 {
+	status = "okay";
+
+	phy16: ethernet-phy@16 {
+		reg = <16>;
+		realtek,smi-address = <1>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <0>;
+		pses = <&pse1 0>;
+	};
+
+	phy17: ethernet-phy@17 {
+		reg = <17>;
+		realtek,smi-address = <2>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <0>;
+		pses = <&pse1 1>;
+	};
+
+	phy18: ethernet-phy@18 {
+		reg = <18>;
+		realtek,smi-address = <3>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <1>;
+		pses = <&pse1 2>;
+	};
+
+	phy19: ethernet-phy@19 {
+		reg = <19>;
+		realtek,smi-address = <4>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <1>;
+		pses = <&pse1 3>;
+	};
+
+	phy20: ethernet-phy@20 {
+		reg = <20>;
+		realtek,smi-address = <5>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <0>;
+		pses = <&pse2 0>;
+	};
+
+	phy21: ethernet-phy@21 {
+		reg = <21>;
+		realtek,smi-address = <6>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <0>;
+		pses = <&pse2 1>;
+	};
+
+	phy22: ethernet-phy@22 {
+		reg = <22>;
+		realtek,smi-address = <7>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <1>;
+		pses = <&pse2 2>;
+	};
+
+	phy23: ethernet-phy@23 {
+		reg = <23>;
+		realtek,smi-address = <8>;
+		compatible = "ethernet-phy-ieee802.3-c45";
+		mdi-reverse = <1>;
+		pses = <&pse2 3>;
+	};
+};
+
+&switch0 {
+	ethernet-ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@16 {
+			reg = <16>;
+			label = "lan1";
+			led-set = <0>;
+			pcs-handle = <&serdes6>;
+			phy-handle = <&phy16>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@17 {
+			reg = <17>;
+			label = "lan2";
+			led-set = <0>;
+			pcs-handle = <&serdes6>;
+			phy-handle = <&phy17>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@18 {
+			reg = <18>;
+			label = "lan3";
+			led-set = <0>;
+			pcs-handle = <&serdes6>;
+			phy-handle = <&phy18>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@19 {
+			reg = <19>;
+			label = "lan4";
+			led-set = <0>;
+			pcs-handle = <&serdes6>;
+			phy-handle = <&phy19>;
+			phy-mode = "10g-qxgmii";
+		};
+
+		port@20 {
+			reg = <20>;
+			label = "lan5";
+			led-set = <0>;
+			pcs-handle = <&serdes7>;
+			phy-handle = <&phy20>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@21 {
+			reg = <21>;
+			label = "lan6";
+			led-set = <0>;
+			pcs-handle = <&serdes7>;
+			phy-handle = <&phy21>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@22 {
+			reg = <22>;
+			label = "lan7";
+			led-set = <0>;
+			pcs-handle = <&serdes7>;
+			phy-handle = <&phy22>;
+			phy-mode = "10g-qxgmii";
+		};
+		port@23 {
+			reg = <23>;
+			label = "lan8";
+			led-set = <0>;
+			pcs-handle = <&serdes7>;
+			phy-handle = <&phy23>;
+			phy-mode = "10g-qxgmii";
+		};
+
+		port@26 {
+			reg = <26>;
+			label = "lan9";
+			led-set = <3>;
+			phy-mode = "10gbase-r";
+			managed = "in-band-status";
+			pcs-handle = <&serdes8>;
+			sfp = <&sfp_p26>;
+		};
+
+		port@27 {
+			reg = <27>;
+			label = "lan10";
+			led-set = <3>;
+			phy-mode = "10gbase-r";
+			managed = "in-band-status";
+			pcs-handle = <&serdes9>;
+			sfp = <&sfp_p27>;
+		};
+
+		port@28 {
+			reg = <28>;
+			label = "cpu";
+			ethernet = <&ethernet0>;
+			phy-mode = "internal";
+
+			fixed-link {
+				speed = <1000>;
+				full-duplex;
+			};
+		};
+	};
+};

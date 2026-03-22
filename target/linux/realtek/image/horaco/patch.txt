@@ -1,0 +1,3 @@
+# This is a patch.txt file.
+cp /home/patch/patch.txt /mnt/patch.txt
+sh /home/patch/install.sh
